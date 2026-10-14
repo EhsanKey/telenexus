@@ -417,7 +417,8 @@ If Telegram requests a Two-Step Verification password, the application must disp
 
 The user must be able to submit the password to complete authentication.
 
-The password field must be masked, and the password must not be persisted in the application database, browser storage, application logs, or backups.
+The password field must be masked by default with an interactive Show/Hide visibility toggle, and the password must not be persisted in the application database, browser storage, application logs, or backups.
+All passcode and authentication password input fields across the application must provide this toggle.
 
 If authentication fails, the application must display an appropriate error and allow the user to retry.
 

@@ -13,7 +13,7 @@ SOURCE OF TRUTH authenticates directly with Telegram's MTProto API using a user 
   - `FR-AUTH-006`: API ID / API Hash stored in backend secrets only.
   - `FR-AUTH-007`: Dynamic phone number authentication (any valid international format).
   - `FR-AUTH-008`: Verification code input (SMS / internal Telegram app message).
-  - `FR-AUTH-009`: Two-Step Verification (2FA cloud password masked).
+  - `FR-AUTH-009`: Two-Step Verification (2FA cloud password masked with Show/Hide toggle).
   - `FR-AUTH-010`: Dynamic flow adaptation.
   - `FR-AUTH-011`: Cancellation of pending auth.
   - `FR-AUTH-012`: Telegram authentication rate limits (`FLOOD_WAIT`).
@@ -166,6 +166,7 @@ To prevent unauthorized access across multiple browsers or devices when an activ
    - **Route:** `POST /api/backend/auth/dashboard-logout`
    - **Behavior:** Revokes the browser's bearer token. Telegram MTProto session on the server remains active.
 5. **Token Enforcement:** Browser sends `x-dashboard-token: <token>`. Middleware on the backend verifies the token for protected endpoints with HTTP 401 `DASHBOARD_LOCKED` code.
+6. **Password & Passcode Visibility:** All 2FA and passcode input fields feature interactive Show/Hide visibility toggles (`Eye`/`EyeOff` icons) for improved usability without sacrificing security.
 
 ## 6. Verification Checklist
 - [x] Validates E.164 phone number formatting before calling Telegram MTProto.
@@ -175,4 +176,5 @@ To prevent unauthorized access across multiple browsers or devices when an activ
 - [x] Master passcode required to unlock dashboard on secondary devices/browsers.
 - [x] Dashboard logout preserves MTProto server connection while locking the client interface.
 - [x] Account disconnection wipes and resets the master passcode completely.
+- [x] 2FA password and master passcode inputs provide interactive Show/Hide visibility toggles.
 
