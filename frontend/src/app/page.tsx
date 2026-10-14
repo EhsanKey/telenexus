@@ -6,8 +6,8 @@ import { AuthModal } from '@/components/auth/AuthModal';
 import { DashboardLockScreen } from '@/components/auth/DashboardLockScreen';
 import { PasscodeSetupModal } from '@/components/auth/PasscodeSetupModal';
 import { ConversationList } from '@/components/chat/ConversationList';
-import { MessageViewer } from '@/components/chat/MessageViewer';
-import { CustomProfileDrawer } from '@/components/profile/CustomProfileDrawer';
+import { ContactIntelligenceHub } from '@/components/profile/ContactIntelligenceHub';
+import { EphemeralChatModal } from '@/components/chat/EphemeralChatModal';
 import { BackupModal } from '@/components/backup/BackupModal';
 import type {
   AuthState,
@@ -18,6 +18,19 @@ import type {
 import type { DialogItem, DialogCategory } from '@/types/telegram';
 import type { CustomProfileDto, TagDto } from '@/types/profile';
 import { PAGINATION_DEFAULTS } from '@/lib/constants';
+import {
+  Shield,
+  Users,
+  Lock,
+  Cloud,
+  MessageSquare,
+  Sparkles,
+  RotateCw,
+  FolderArchive,
+  Radio,
+  User,
+  Key,
+} from 'lucide-react';
 
 interface HealthData {
   status: string;
@@ -49,8 +62,8 @@ export default function WorkspacePage() {
   // SPEC-07: Google Drive Backup State
   const [backupModalOpen, setBackupModalOpen] = useState(false);
 
-  // SPEC-08: Desktop Three-Panel Layout & Unsaved Changes Guard State
-  const [isProfileOpen, setIsProfileOpen] = useState(true);
+  // SPEC-08: CRM Focus & Ephemeral Chat Modal State
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
   const [isProfileDirty, setIsProfileDirty] = useState(false);
 
   // SPEC-03 & SPEC-06: Dialogs, Infinite Scroll & Tags State
@@ -74,6 +87,21 @@ export default function WorkspacePage() {
     }, 250);
     return () => clearTimeout(handler);
   }, [searchQuery]);
+
+  // Global Keyboard Shortcuts (SPEC-08 §5.1 & Alt+M for Ephemeral Chat)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Alt+M or Alt+C toggles ephemeral chat modal
+      if ((e.altKey && (e.key === 'm' || e.key === 'M')) || (e.altKey && (e.key === 'c' || e.key === 'C'))) {
+        e.preventDefault();
+        if (selectedDialog) {
+          setIsChatModalOpen((prev) => !prev);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedDialog]);
 
   // SPEC-08 §5.3: Dialog Selection Interceptor with Unsaved Changes Guard
   const handleSelectDialog = (d: DialogItem) => {
@@ -305,116 +333,146 @@ export default function WorkspacePage() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#0B0E14] text-slate-100 font-sans">
-      {/* PANEL A: Navigation Sidebar (240px) */}
-      <aside className="w-[240px] shrink-0 bg-[#111827] border-r border-slate-800 flex flex-col justify-between p-4">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#080B10] text-slate-100 font-sans select-none">
+      {/* ========================================================================= */}
+      {/* PANEL A: Navigation Sidebar (240px) (SPEC-08 Topology Invariant: 220-260px) */}
+      {/* ========================================================================= */}
+      <aside className="w-[240px] shrink-0 bg-[#0B0F19] border-r border-slate-800/80 flex flex-col justify-between p-4 z-20">
         <div>
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-600 to-indigo-500 flex items-center justify-center font-bold text-white shadow-md shadow-sky-500/20 text-xs">
+          {/* Brand Logo & TeleNexus Identity */}
+          <div className="flex items-center gap-2.5 mb-6 px-1">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 via-indigo-600 to-purple-600 flex items-center justify-center font-extrabold text-white shadow-lg shadow-sky-500/20 text-sm">
               TN
             </div>
             <div>
-              <h1 className="font-semibold text-sm leading-tight tracking-wide text-white">TeleNexus</h1>
-              <p className="text-[11px] text-slate-400">Personal Intelligence & CRM</p>
+              <h1 className="font-bold text-sm leading-tight tracking-wide text-white flex items-center gap-1.5">
+                <span>TeleNexus</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+              </h1>
+              <p className="text-[10px] text-slate-400 font-medium tracking-tight">
+                Intelligence CRM Vault
+              </p>
             </div>
           </div>
 
-          <nav className="space-y-1 text-xs">
-            <button
-              onClick={() => setActiveCategory('all')}
-              className={`w-full px-3 py-2 rounded-md font-medium flex justify-between items-center transition text-left ${
-                activeCategory === 'all'
-                  ? 'bg-slate-800 text-sky-400'
-                  : 'text-slate-400 hover:bg-slate-800/60'
-              }`}
-            >
-              <span>All Dialogs</span>
-              <span className="text-[10px] bg-slate-700/80 px-1.5 py-0.5 rounded text-slate-300">
-                {dialogs.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveCategory('pv')}
-              className={`w-full px-3 py-2 rounded-md transition text-left ${
-                activeCategory === 'pv'
-                  ? 'bg-slate-800 text-sky-400 font-medium'
-                  : 'text-slate-400 hover:bg-slate-800/60'
-              }`}
-            >
-              Private Chats (PV)
-            </button>
-            <button
-              onClick={() => setActiveCategory('groups')}
-              className={`w-full px-3 py-2 rounded-md transition text-left ${
-                activeCategory === 'groups'
-                  ? 'bg-slate-800 text-sky-400 font-medium'
-                  : 'text-slate-400 hover:bg-slate-800/60'
-              }`}
-            >
-              Groups
-            </button>
-            <button
-              onClick={() => setActiveCategory('supergroups')}
-              className={`w-full px-3 py-2 rounded-md transition text-left ${
-                activeCategory === 'supergroups'
-                  ? 'bg-slate-800 text-sky-400 font-medium'
-                  : 'text-slate-400 hover:bg-slate-800/60'
-              }`}
-            >
-              Supergroups
-            </button>
-            <button
-              onClick={() => setActiveCategory('channels')}
-              className={`w-full px-3 py-2 rounded-md transition text-left ${
-                activeCategory === 'channels'
-                  ? 'bg-slate-800 text-sky-400 font-medium'
-                  : 'text-slate-400 hover:bg-slate-800/60'
-              }`}
-            >
-              Channels
-            </button>
-            <button
-              onClick={() => setActiveCategory('archived')}
-              className={`w-full px-3 py-2 rounded-md transition text-left ${
-                activeCategory === 'archived'
-                  ? 'bg-slate-800 text-sky-400 font-medium'
-                  : 'text-slate-400 hover:bg-slate-800/60'
-              }`}
-            >
-              Archived
-            </button>
-          </nav>
+          {/* Navigation Category Filters */}
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase font-semibold text-slate-500 tracking-wider px-2 block mb-1">
+              Views
+            </span>
+            <nav className="space-y-1 text-xs">
+              <button
+                onClick={() => setActiveCategory('all')}
+                className={`w-full px-3 py-2 rounded-xl font-medium flex justify-between items-center transition text-left ${
+                  activeCategory === 'all'
+                    ? 'bg-slate-800/90 text-sky-400 shadow-sm border border-slate-700/60'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>All Contacts</span>
+                </div>
+                <span className="text-[10px] bg-slate-900 px-1.5 py-0.5 rounded-full text-slate-400 font-mono">
+                  {dialogs.length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveCategory('pv')}
+                className={`w-full px-3 py-2 rounded-xl transition text-left flex items-center gap-2 ${
+                  activeCategory === 'pv'
+                    ? 'bg-slate-800/90 text-sky-400 font-medium shadow-sm border border-slate-700/60'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Private Chats (PV)</span>
+              </button>
+
+              <button
+                onClick={() => setActiveCategory('groups')}
+                className={`w-full px-3 py-2 rounded-xl transition text-left flex items-center gap-2 ${
+                  activeCategory === 'groups'
+                    ? 'bg-slate-800/90 text-sky-400 font-medium shadow-sm border border-slate-700/60'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Groups</span>
+              </button>
+
+              <button
+                onClick={() => setActiveCategory('supergroups')}
+                className={`w-full px-3 py-2 rounded-xl transition text-left flex items-center gap-2 ${
+                  activeCategory === 'supergroups'
+                    ? 'bg-slate-800/90 text-sky-400 font-medium shadow-sm border border-slate-700/60'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 text-teal-400" />
+                <span>Supergroups</span>
+              </button>
+
+              <button
+                onClick={() => setActiveCategory('channels')}
+                className={`w-full px-3 py-2 rounded-xl transition text-left flex items-center gap-2 ${
+                  activeCategory === 'channels'
+                    ? 'bg-slate-800/90 text-sky-400 font-medium shadow-sm border border-slate-700/60'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>Channels</span>
+              </button>
+
+              <button
+                onClick={() => setActiveCategory('archived')}
+                className={`w-full px-3 py-2 rounded-xl transition text-left flex items-center gap-2 ${
+                  activeCategory === 'archived'
+                    ? 'bg-slate-800/90 text-sky-400 font-medium shadow-sm border border-slate-700/60'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <FolderArchive className="w-3.5 h-3.5" />
+                <span>Archived</span>
+              </button>
+            </nav>
+          </div>
         </div>
 
-        <div>
+        {/* Sidebar Bottom: Session Card, Security & Cloud Sync */}
+        <div className="space-y-2.5">
           {/* Subsystem Health Indicator */}
-          <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800 text-[11px] space-y-1.5 mb-2">
+          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 text-[11px] space-y-1 shadow-sm">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">Backend Core:</span>
+              <span className="text-slate-400 font-medium">Core API:</span>
               {loading ? (
-                <span className="text-amber-400 animate-pulse">Checking...</span>
+                <span className="text-amber-400 animate-pulse text-[10px]">Checking...</span>
               ) : health ? (
-                <span className="text-emerald-400 font-medium">● Connected (Port 4000)</span>
+                <span className="text-emerald-400 font-mono text-[10px] flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 4000 OK
+                </span>
               ) : (
-                <span className="text-rose-400 font-medium">Offline</span>
+                <span className="text-rose-400 font-mono text-[10px]">Offline</span>
               )}
             </div>
             <div className="flex items-center justify-between text-[10px] text-slate-500">
-              <span>Reverse Proxy:</span>
-              <span className="text-sky-400">/api/backend/*</span>
+              <span>Proxy Isolation:</span>
+              <span className="text-sky-400 font-mono">/api/backend/*</span>
             </div>
           </div>
 
-          {/* Telegram MTProto Connection Card (SPEC-02) */}
-          <div className="p-3 bg-[#0F172A] rounded-xl border border-sky-950/60 text-xs space-y-2.5 shadow-sm">
+          {/* Telegram MTProto Session Card (SPEC-02) */}
+          <div className="p-3 bg-gradient-to-br from-slate-900/90 to-slate-950/90 rounded-2xl border border-slate-800/90 text-xs space-y-2.5 shadow-sm">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-semibold text-slate-300">Telegram Session</span>
               {authState === 'CONNECTED' && connectedAccount ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium flex items-center gap-1">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium flex items-center gap-1 border border-emerald-500/20">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active
                 </span>
               ) : (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
                   Disconnected
                 </span>
               )}
@@ -422,10 +480,10 @@ export default function WorkspacePage() {
 
             {connectedAccount ? (
               <div className="text-[11px] text-slate-300 truncate">
-                <span className="text-slate-400 block text-[10px]">Connected Account:</span>
-                <strong className="text-white">{connectedAccount.displayName}</strong>{' '}
+                <span className="text-slate-400 block text-[10px]">Connected as:</span>
+                <strong className="text-white font-medium">{connectedAccount.displayName}</strong>{' '}
                 {connectedAccount.username && (
-                  <span className="text-sky-400">(@{connectedAccount.username})</span>
+                  <span className="text-sky-400 block font-mono text-[10px]">@{connectedAccount.username}</span>
                 )}
               </div>
             ) : (
@@ -438,10 +496,10 @@ export default function WorkspacePage() {
               <button
                 type="button"
                 onClick={() => setAuthModalOpen(true)}
-                className={`w-full py-2 px-3 rounded-lg text-xs font-medium transition shadow-sm ${
+                className={`w-full py-2 px-3 rounded-xl text-xs font-semibold transition shadow-sm ${
                   connectedAccount
-                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-                    : 'bg-[#0088CC] hover:bg-sky-500 text-white shadow-sky-500/20'
+                    ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60'
+                    : 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white shadow-sky-500/20'
                 }`}
               >
                 {connectedAccount ? 'Manage Session' : 'Connect Telegram'}
@@ -452,34 +510,35 @@ export default function WorkspacePage() {
                 <button
                   type="button"
                   onClick={handleLockDashboard}
-                  className="w-full py-1.5 px-3 rounded-lg text-xs font-medium bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition flex items-center justify-center gap-1.5"
+                  className="w-full py-1.5 px-3 rounded-xl text-xs font-medium bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition flex items-center justify-center gap-1.5"
                 >
-                  <span>🔒</span> Lock Dashboard
+                  <Lock className="w-3 h-3 text-amber-400" />
+                  <span>Lock Dashboard</span>
                 </button>
               )}
             </div>
           </div>
 
           {/* Google Drive Backup & Recovery Trigger (SPEC-07) */}
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => setBackupModalOpen(true)}
-              className="w-full py-2 px-3 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition flex items-center justify-between shadow-sm group"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sky-400">☁️</span>
-                <span>Drive Backups</span>
-              </div>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-950 text-sky-400 group-hover:bg-sky-900 font-mono">
-                AES-256
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setBackupModalOpen(true)}
+            className="w-full py-2 px-3 bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-slate-700 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition flex items-center justify-between shadow-sm group"
+          >
+            <div className="flex items-center gap-2">
+              <Cloud className="w-3.5 h-3.5 text-sky-400" />
+              <span>Drive Backups</span>
+            </div>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-950 text-sky-400 group-hover:bg-sky-900 font-mono">
+              AES-256
+            </span>
+          </button>
         </div>
       </aside>
 
-      {/* PANEL B: Conversation List (340px) (SPEC-03) */}
+      {/* ========================================================================= */}
+      {/* PANEL B: Contact Directory List (340px) (SPEC-08 Invariant: 300-380px)   */}
+      {/* ========================================================================= */}
       <ConversationList
         dialogs={dialogs}
         selectedId={selectedDialog ? selectedDialog.id : null}
@@ -498,28 +557,33 @@ export default function WorkspacePage() {
         onTagSelect={(tId) => setSelectedTagId(tId)}
       />
 
-      {/* PANEL C: Ephemeral Message Viewer & CRM Panel (SPEC-04 & SPEC-05) */}
-      <main className="flex-1 flex bg-[#0B0E14] relative overflow-hidden">
-        {/* Central Ephemeral Stream (SPEC-04) */}
-        <section className="flex-1 flex flex-col h-full min-w-0">
-          <MessageViewer
-            dialog={selectedDialog}
-            onRefreshMetadata={handleRefreshEntity}
-            isProfileOpen={isProfileOpen}
-            onToggleProfile={() => setIsProfileOpen((prev) => !prev)}
-            onBackToList={() => setSelectedDialog(null)}
-          />
-        </section>
-
-        {/* Right CRM Profile Drawer (360px) (SPEC-05 & SPEC-08) */}
-        <CustomProfileDrawer
+      {/* ========================================================================= */}
+      {/* PANEL C: Central Stage: Contact Intelligence & CRM Hub (Flexible Fill)    */}
+      {/* ========================================================================= */}
+      <main className="flex-1 flex bg-[#080B10] relative overflow-hidden">
+        <ContactIntelligenceHub
           dialog={selectedDialog}
-          isOpen={isProfileOpen}
-          onClose={() => setIsProfileOpen(false)}
-          onDirtyChange={(dirty) => setIsProfileDirty(dirty)}
+          allDialogsCount={dialogs.length}
+          tags={tags}
+          onRefreshMetadata={handleRefreshEntity}
+          onOpenEphemeralChat={() => setIsChatModalOpen(true)}
           onProfileUpdated={handleProfileUpdated}
+          onDirtyChange={(dirty) => setIsProfileDirty(dirty)}
+          onOpenBackups={() => setBackupModalOpen(true)}
+          onOpenAuth={() => setAuthModalOpen(true)}
+          isConnected={authState === 'CONNECTED'}
         />
       </main>
+
+      {/* ========================================================================= */}
+      {/* MODAL: Ephemeral Chat Viewer (User Priority: Compact & Modular on-demand)   */}
+      {/* ========================================================================= */}
+      <EphemeralChatModal
+        isOpen={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+        dialog={selectedDialog}
+        onRefreshMetadata={handleRefreshEntity}
+      />
 
       {/* Telegram MTProto Authentication Modal (SPEC-02) */}
       <AuthModal

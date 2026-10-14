@@ -3,15 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --background: #0B0E14;
-  --foreground: #F1F5F9;
-  --surface-1: #111827;
-  --surface-2: #161F30;
-  --surface-3: #1E293B;
-  --border: #334155;
+  --background: #080B10;
+  --foreground: #F8FAFC;
+  --surface-1: #0F172A;
+  --surface-2: #131D33;
+  --surface-3: #1B2744;
+  --border: #223252;
   --sidebar-w: 240px;
   --dialogs-w: 340px;
   --drawer-w: 380px;
+  --brand-telegram: #0088CC;
+  --brand-accent: #38BDF8;
+  --crm-emerald: #10B981;
+  --crm-indigo: #6366F1;
 }
 
 body {
@@ -19,20 +23,71 @@ body {
   background: var(--background);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow: hidden;
+  user-select: none;
 }
 
-/* Custom Scrollbar */
+/* Glassmorphism primitives */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.glass-card {
+  background: rgba(22, 31, 48, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  background: rgba(30, 41, 64, 0.75);
+  border-color: rgba(56, 189, 248, 0.25);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 0 15px -3px rgba(56, 189, 248, 0.1);
+}
+
+.glow-blue {
+  box-shadow: 0 0 25px -5px rgba(56, 189, 248, 0.25);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.2);
+}
+
+/* Minimal Modern Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
-  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.18);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: rgba(148, 163, 184, 0.35);
+}
+
+/* Hide scrollbars for pure horizontal filter chips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Shimmer pulse for loading placeholders */
+@keyframes shimmer {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.4; }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.8s infinite ease-in-out;
 }
