@@ -60,6 +60,17 @@ export function ConversationList({
     { key: 'channels', label: 'Channels', icon: <Radio className="w-3 h-3" /> },
   ];
 
+  const [refreshCooldown, setRefreshCooldown] = React.useState(false);
+
+  const handleRefreshClick = () => {
+    if (loading || refreshCooldown) return;
+    setRefreshCooldown(true);
+    onRefresh(true);
+    setTimeout(() => {
+      setRefreshCooldown(false);
+    }, 3000);
+  };
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     if (
@@ -88,9 +99,9 @@ export function ConversationList({
 
           <button
             type="button"
-            onClick={() => onRefresh(true)}
-            title="Refresh Contacts & Metadata from MTProto"
-            disabled={loading}
+            onClick={handleRefreshClick}
+            title={refreshCooldown ? 'Please wait a moment before refreshing...' : 'Refresh Contacts & Metadata from MTProto'}
+            disabled={loading || refreshCooldown}
             className="p-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700/80 text-slate-300 hover:text-sky-300 disabled:opacity-50 transition border border-slate-700/50"
           >
             <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-sky-400' : ''}`} />

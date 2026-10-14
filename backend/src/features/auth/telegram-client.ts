@@ -147,6 +147,13 @@ export class TelegramService {
     if (!this.client) {
       const clientOptions: any = {
         connectionRetries: 5,
+        deviceModel: 'PC 64bit',
+        systemVersion: 'Windows 11',
+        appVersion: '5.10.4 x64',
+        langCode: 'en',
+        systemLangCode: 'en',
+        useWSS: false,
+        autoReconnect: true,
       };
 
       if (env.TELEGRAM_PROXY_HOST && env.TELEGRAM_PROXY_PORT) {
@@ -394,6 +401,24 @@ export class TelegramService {
       const seconds = parseInt(floodMatch[1], 10);
       this.state = 'FLOOD_WAIT';
       throw new FloodWaitError(seconds);
+    }
+
+    if (errMsg.includes('PEER_FLOOD')) {
+      throw new AppError(
+        'Telegram Anti-Spam protection triggered (PEER_FLOOD). Your account is temporarily restricted from initiating conversations with non-contacts. Please wait.',
+        'PEER_FLOOD',
+        429
+      );
+    }
+
+    if (errMsg.includes('USER_DEACTIVATED') || errMsg.includes('AUTH_KEY_UNREGISTERED')) {
+      this.state = 'DISCONNECTED';
+      this.cachedAccount = null;
+      throw new AppError(
+        'Telegram session has been revoked or deactivated by Telegram.',
+        'SESSION_REVOKED',
+        401
+      );
     }
 
     if (errMsg.includes('PHONE_NUMBER_INVALID')) {
