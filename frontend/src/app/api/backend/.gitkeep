@@ -1,0 +1,2 @@
+# Next.js Route Handlers acting as reverse proxy to backend API (port 4000)
+# (e.g. /api/backend/auth/*, /api/backend/telegram/*, /api/backend/profiles/*)

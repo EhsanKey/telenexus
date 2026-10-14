@@ -1,0 +1,16 @@
+# Backend Local Ignore
+node_modules/
+dist/
+.sessions/
+*.session
+*.session-journal
+.drive-tokens.json
+*.tokens.json
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+*.log
+coverage/
+*.tsbuildinfo

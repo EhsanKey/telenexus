@@ -1,0 +1,18 @@
+{
+  "name": "source-of-truth-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram Personal Intelligence & Contact Management Platform (TeleNexus)",
+  "scripts": {
+    "dev": "pnpm --parallel run dev",
+    "dev:backend": "pnpm --filter backend run dev",
+    "dev:frontend": "pnpm --filter frontend run dev",
+    "build": "pnpm --recursive run build",
+    "test": "pnpm --recursive run test",
+    "test:invariants": "pnpm --filter backend run test:invariants",
+    "lint": "pnpm --recursive run lint",
+    "db:migrate": "pnpm --filter backend run db:migrate",
+    "db:clean": "pnpm --filter backend run db:clean"
+  },
+  "packageManager": "pnpm@10.13.1"
+}

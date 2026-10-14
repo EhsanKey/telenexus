@@ -1,0 +1,1 @@
+# Invariant tests directory: Enforces zero message persistence in PostgreSQL, logs, and backups.
