@@ -10,6 +10,7 @@ export const BACKEND_API_BASE =
 export interface ProxyOptions {
   subsystem: string;
   subPath?: string;
+  context?: { params?: Promise<{ path?: string[] | string }> | { path?: string[] | string } };
 }
 
 /**
@@ -25,9 +26,34 @@ export async function proxyToBackend(
   options: ProxyOptions
 ): Promise<NextResponse> {
   try {
-    const { subsystem, subPath } = options;
+    const { subsystem } = options;
     const url = new URL(req.url);
     const queryString = url.search;
+
+    let subPath = options.subPath;
+    if (subPath === undefined && options.context?.params) {
+      try {
+        const resolved = await options.context.params;
+        if (resolved?.path) {
+          subPath = Array.isArray(resolved.path) ? resolved.path.join('/') : String(resolved.path);
+        }
+      } catch {
+        // Fallback to URL parsing
+      }
+    }
+
+    if (subPath === undefined) {
+      try {
+        const pathname = req.nextUrl?.pathname || url.pathname;
+        const prefix = `/api/backend/${subsystem}`;
+        if (pathname.startsWith(prefix)) {
+          subPath = pathname.slice(prefix.length).replace(/^\/+/, '');
+        }
+      } catch {
+        subPath = '';
+      }
+    }
+
     const pathPart = subPath ? `/${subPath}` : '';
     const targetUrl = `${BACKEND_API_BASE}/${subsystem}${pathPart}${queryString}`;
 
