@@ -1,3 +1,4 @@
+import { Api } from 'telegram';
 import {
   normalizeTelegramPeer,
   resolveDisplayName,
@@ -261,8 +262,8 @@ export class DialogsService {
     if (shouldSyncFromMtproto && client) {
       try {
         const [mainDialogs, archivedDialogs] = await Promise.all([
-          client.getDialogs({ folder: 0, limit: 250 }),
-          client.getDialogs({ folder: 1, limit: 150 }).catch(() => []),
+          client.getDialogs({ limit: 500 }),
+          client.getDialogs({ folder: 1, limit: 200 }).catch(() => []),
         ]);
         const rawDialogs = [...mainDialogs, ...archivedDialogs];
 
@@ -413,6 +414,87 @@ export class DialogsService {
           Boolean(tagMatch)
         );
       });
+
+      // MTProto Deep Search Fallback:
+      // When local cache has no match or user searches with '@', query Telegram MTProto
+      if (
+        client &&
+        authState === 'CONNECTED' &&
+        process.env.NODE_ENV !== 'test' &&
+        (filtered.length === 0 || query.startsWith('@'))
+      ) {
+        try {
+          const cleanQ = query.replace(/^@/, '').trim();
+          const newlyDiscovered: DialogItem[] = [];
+
+          // 1. Search via MTProto contacts.Search (covers user's joined chats, channels, contacts, and global)
+          try {
+            const searchResult: any = await client.invoke(
+              new Api.contacts.Search({
+                q: cleanQ,
+                limit: 20,
+              })
+            );
+
+            const entities = [
+              ...(searchResult.chats || []),
+              ...(searchResult.users || []),
+            ];
+
+            for (const ent of entities) {
+              const item = this.normalizeRawEntityToDialogItem(ent);
+              if (item) newlyDiscovered.push(item);
+            }
+          } catch (searchErr) {
+            logger.debug({ searchErr }, 'contacts.Search MTProto fallback failed');
+          }
+
+          // 2. Direct entity lookup if it's a valid handle without spaces
+          if (!cleanQ.includes(' ') && newlyDiscovered.length === 0) {
+            try {
+              const directEntity = await client.getEntity(cleanQ);
+              if (directEntity) {
+                const item = this.normalizeRawEntityToDialogItem(directEntity);
+                if (item) newlyDiscovered.push(item);
+              }
+            } catch (entityErr) {
+              logger.debug({ entityErr }, 'client.getEntity MTProto fallback failed');
+            }
+          }
+
+          // Merge into inMemoryDialogs and filtered results
+          for (const item of newlyDiscovered) {
+            const inMemIndex = this.inMemoryDialogs.findIndex(
+              (m) => m.telegramPeerId === item.telegramPeerId || m.id === item.id
+            );
+            if (inMemIndex === -1) {
+              this.inMemoryDialogs.push(item);
+            } else {
+              if (this.inMemoryDialogs[inMemIndex]?.customProfile) {
+                item.customProfile = this.inMemoryDialogs[inMemIndex].customProfile;
+              }
+            }
+
+            const inFiltered = filtered.some(
+              (f) => f.telegramPeerId === item.telegramPeerId || f.id === item.id
+            );
+            if (!inFiltered) {
+              let matchesCategory = true;
+              if (category === 'pv') matchesCategory = item.entityType === 'user';
+              else if (category === 'groups') matchesCategory = item.entityType === 'group' || item.entityType === 'supergroup';
+              else if (category === 'supergroups') matchesCategory = item.entityType === 'supergroup';
+              else if (category === 'channels') matchesCategory = item.entityType === 'channel';
+              else if (category === 'archived') matchesCategory = item.isArchived;
+
+              if (matchesCategory) {
+                filtered.push(item);
+              }
+            }
+          }
+        } catch (err) {
+          logger.warn({ err }, 'Error during MTProto search fallback');
+        }
+      }
     }
 
     const total = filtered.length;
@@ -427,6 +509,53 @@ export class DialogsService {
       page,
       totalPages,
       hasMore,
+    };
+  }
+
+  private normalizeRawEntityToDialogItem(rawEntity: any): DialogItem | null {
+    if (!rawEntity) return null;
+    const isUser = Boolean(rawEntity.className === 'User');
+    const isSupergroup = Boolean(rawEntity.className === 'Channel' && rawEntity.megagroup);
+    const isChannel = Boolean(rawEntity.className === 'Channel' && !rawEntity.megagroup);
+    const isGroup = Boolean(rawEntity.className === 'Chat');
+
+    let entityType: NormalizedEntityType = 'user';
+    if (isSupergroup) entityType = 'supergroup';
+    else if (isChannel) entityType = 'channel';
+    else if (isGroup) entityType = 'group';
+
+    const cleanId = String(rawEntity.id || '')
+      .replace(/^-100/, '')
+      .replace(/^-/, '');
+    const peerId = cleanId || String(rawEntity.id);
+    if (!peerId) return null;
+
+    const displayName =
+      rawEntity.title ||
+      [rawEntity.firstName, rawEntity.lastName].filter(Boolean).join(' ') ||
+      rawEntity.phone ||
+      (entityType === 'channel'
+        ? `Channel (${peerId})`
+        : entityType === 'group' || entityType === 'supergroup'
+        ? `Group (${peerId})`
+        : `Contact (${peerId})`);
+
+    const username = extractTelegramUsername(rawEntity);
+
+    return {
+      id: `ent-${peerId}`,
+      entityType,
+      telegramPeerId: peerId,
+      displayName,
+      username,
+      publicUrl: username ? `https://t.me/${username}` : null,
+      isArchived: false,
+      customProfile: null,
+      transientPreview: {
+        text: '',
+        date: Math.floor(Date.now() / 1000),
+        unreadCount: 0,
+      },
     };
   }
 
@@ -478,7 +607,7 @@ export class DialogsService {
   }> {
     // Auto-update username and numeric peer ID if entity has a custom profile
     try {
-      const cleanPeer = peerId.replace(/^ent-/, '');
+      const cleanPeer = peerId.replace(/^ent-/, '').replace(/^-100/, '').replace(/^-/, '');
       const dialog = this.inMemoryDialogs.find(
         (d) => d.telegramPeerId === cleanPeer || d.id === peerId || d.id === `ent-${cleanPeer}`
       );
@@ -500,7 +629,21 @@ export class DialogsService {
     const client = telegramService.getClient();
     if (client && telegramService.getState() === 'CONNECTED') {
       try {
-        const rawMessages = await client.getMessages(peerId, {
+        const cleanPeer = peerId.replace(/^ent-/, '').replace(/^-100/, '').replace(/^-/, '');
+        const dialog = this.inMemoryDialogs.find(
+          (d) => d.telegramPeerId === cleanPeer || d.id === peerId || d.id === `ent-${cleanPeer}`
+        );
+
+        let targetPeer: any = peerId;
+        if (dialog?.username) {
+          targetPeer = dialog.username;
+        } else if (dialog?.entityType === 'channel' || dialog?.entityType === 'supergroup') {
+          targetPeer = `-100${cleanPeer}`;
+        } else if (dialog?.entityType === 'group') {
+          targetPeer = `-${cleanPeer}`;
+        }
+
+        const rawMessages = await client.getMessages(targetPeer, {
           limit,
           offsetId: options.offsetId,
           offsetDate: options.offsetDate,

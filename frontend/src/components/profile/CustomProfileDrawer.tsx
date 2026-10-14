@@ -341,42 +341,98 @@ export function CustomProfileDrawer({
   // ==========================================
 
   const handleToggleTag = async (tag: TagDto) => {
-    if (!profile) return;
-    setSavingTag(true);
+    if (!dialog) return;
     setFeedback(null);
-    try {
-      const isCurrentlyAssigned = profile.tags.some((t) => t.id === tag.id);
-      const newTagIds = isCurrentlyAssigned
-        ? profile.tags.filter((t) => t.id !== tag.id).map((t) => t.id)
-        : [...profile.tags.map((t) => t.id), tag.id];
 
+    let activeProfile = profile;
+    if (!activeProfile) {
+      try {
+        const payload: CreateProfileInput = {
+          telegramEntityId: dialog.id,
+          telegramPeerId: dialog.telegramPeerId,
+          telegramDisplayName: dialog.displayName || null,
+          username: dialog.username,
+          entityType: dialog.entityType,
+        };
+        activeProfile = await apiFetch<CustomProfileDto>('/api/backend/profiles', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        setProfile(activeProfile);
+        onProfileUpdated(activeProfile);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to create profile for tag';
+        setFeedback({ type: 'error', message: msg });
+        return;
+      }
+    }
+
+    const isCurrentlyAssigned = activeProfile.tags.some((t) => t.id === tag.id);
+    const newTags = isCurrentlyAssigned
+      ? activeProfile.tags.filter((t) => t.id !== tag.id)
+      : [...activeProfile.tags, tag];
+
+    const previousProfile = activeProfile;
+    const optimisticProfile: CustomProfileDto = {
+      ...activeProfile,
+      tags: newTags,
+    };
+
+    // Instant optimistic UI update for buttery-smooth interaction
+    setProfile(optimisticProfile);
+    onProfileUpdated(optimisticProfile);
+
+    try {
       const assignedTags = await apiFetch<TagDto[]>(
-        `/api/backend/profiles/${profile.id}/tags`,
+        `/api/backend/profiles/${activeProfile.id}/tags`,
         {
           method: 'PUT',
-          body: JSON.stringify({ tagIds: newTagIds }),
+          body: JSON.stringify({ tagIds: newTags.map((t) => t.id) }),
         }
       );
 
-      const updatedProfile: CustomProfileDto = {
-        ...profile,
+      const finalizedProfile: CustomProfileDto = {
+        ...optimisticProfile,
         tags: assignedTags,
       };
-
-      setProfile(updatedProfile);
-      onProfileUpdated(updatedProfile);
-      await fetchAvailableTags();
+      setProfile(finalizedProfile);
+      onProfileUpdated(finalizedProfile);
+      fetchAvailableTags().catch(() => null);
     } catch (err: unknown) {
+      // Rollback on network failure
+      setProfile(previousProfile);
+      onProfileUpdated(previousProfile);
       const msg = err instanceof Error ? err.message : 'Failed to update tags';
       setFeedback({ type: 'error', message: msg });
-    } finally {
-      setSavingTag(false);
+    }
+  };
+
+  const handleDeleteTag = async (tagId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!window.confirm('Delete this tag taxonomy from your account?')) return;
+    try {
+      await apiFetch<{ deleted: boolean; id: string }>(`/api/backend/tags/${tagId}`, {
+        method: 'DELETE',
+      });
+      setAvailableTags((prev) => prev.filter((t) => t.id !== tagId));
+      if (profile && profile.tags.some((t) => t.id === tagId)) {
+        const updatedProfile = {
+          ...profile,
+          tags: profile.tags.filter((t) => t.id !== tagId),
+        };
+        setProfile(updatedProfile);
+        onProfileUpdated(updatedProfile);
+      }
+      setFeedback({ type: 'success', message: 'Tag taxonomy deleted successfully.' });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete tag';
+      setFeedback({ type: 'error', message: msg });
     }
   };
 
   const handleCreateNewTag = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile || !newTagName.trim()) return;
+    if (!newTagName.trim()) return;
 
     setSavingTag(true);
     setFeedback(null);
@@ -391,26 +447,12 @@ export function CustomProfileDrawer({
         body: JSON.stringify(payload),
       });
 
-      // Automatically assign new tag to active profile
-      const newTagIds = [...profile.tags.map((t) => t.id), created.id];
-      const assignedTags = await apiFetch<TagDto[]>(
-        `/api/backend/profiles/${profile.id}/tags`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ tagIds: newTagIds }),
-        }
-      );
-
-      const updatedProfile: CustomProfileDto = {
-        ...profile,
-        tags: assignedTags,
-      };
-
-      setProfile(updatedProfile);
+      setAvailableTags((prev) => [...prev.filter((t) => t.id !== created.id), created]);
       setNewTagName('');
       setIsCreatingTag(false);
-      onProfileUpdated(updatedProfile);
-      await fetchAvailableTags();
+
+      // Automatically assign new tag to profile (smoothly creating profile if needed)
+      await handleToggleTag(created);
       setFeedback({ type: 'success', message: `Tag #${created.name} created and attached.` });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create tag';
@@ -550,8 +592,30 @@ export function CustomProfileDrawer({
               className="w-full py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center justify-center gap-1.5 transition shadow-sm shadow-indigo-600/30"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Create CRM Profile</span>
+              <span>Create Full CRM Profile</span>
             </button>
+
+            {availableTags.length > 0 && (
+              <div className="pt-3 border-t border-slate-800/60 text-left">
+                <span className="text-[10px] text-slate-400 block mb-1.5 font-medium uppercase tracking-wider">
+                  Quick Assign Tag:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {availableTags.map((tag) => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => handleToggleTag(tag)}
+                      style={{ borderColor: tag.color, color: tag.color }}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[10px] font-medium transition hover:scale-105 active:scale-95 bg-slate-900/60"
+                    >
+                      <Plus className="w-2.5 h-2.5" />
+                      <span>#{tag.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -865,23 +929,24 @@ export function CustomProfileDrawer({
                         borderColor: `${tag.color}40`,
                         color: tag.color,
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-medium shadow-sm"
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-medium shadow-sm transition"
                     >
                       <span
                         className="w-1.5 h-1.5 rounded-full"
                         style={{ backgroundColor: tag.color }}
                       />
                       <span>#{tag.name}</span>
-                      {isManagingTags && (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTag(tag)}
-                          className="hover:opacity-75 ml-0.5"
-                          title="Remove tag"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleTag(tag);
+                        }}
+                        className="hover:opacity-100 opacity-60 hover:text-rose-400 rounded-full p-0.5 ml-0.5 transition cursor-pointer"
+                        title={`Remove #${tag.name}`}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
                     </span>
                   ))
                 ) : (
@@ -900,21 +965,36 @@ export function CustomProfileDrawer({
                       {availableTags.map((tag) => {
                         const isAssigned = profile.tags.some((t) => t.id === tag.id);
                         return (
-                          <button
+                          <div
                             key={tag.id}
-                            type="button"
-                            onClick={() => handleToggleTag(tag)}
-                            disabled={savingTag}
+                            className="inline-flex items-center rounded-full border transition group overflow-hidden"
                             style={{
                               borderColor: tag.color,
                               backgroundColor: isAssigned ? tag.color : 'transparent',
-                              color: isAssigned ? '#FFFFFF' : tag.color,
                             }}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium transition"
                           >
-                            {isAssigned && <Check className="w-2.5 h-2.5" />}
-                            <span>#{tag.name}</span>
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleTag(tag)}
+                              style={{
+                                color: isAssigned ? '#FFFFFF' : tag.color,
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-medium transition cursor-pointer hover:opacity-90"
+                            >
+                              {isAssigned ? <Check className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
+                              <span>#{tag.name}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteTag(tag.id, e)}
+                              className={`px-1.5 py-0.5 text-[9px] opacity-0 group-hover:opacity-100 transition hover:bg-rose-600/40 ${
+                                isAssigned ? 'text-white' : 'text-slate-400 hover:text-rose-400'
+                              }`}
+                              title={`Delete #${tag.name} taxonomy completely`}
+                            >
+                              <Trash2 className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
