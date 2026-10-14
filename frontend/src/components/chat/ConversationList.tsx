@@ -54,6 +54,7 @@ export function ConversationList({
 }: ConversationListProps) {
   const categories: { key: DialogCategory; label: string; icon: React.ReactNode }[] = [
     { key: 'all', label: 'All', icon: <MessageCircle className="w-3 h-3" /> },
+    { key: 'crm', label: 'In CRM', icon: <Sparkles className="w-3 h-3 text-emerald-400" /> },
     { key: 'pv', label: 'Private (PV)', icon: <User className="w-3 h-3" /> },
     { key: 'groups', label: 'Groups', icon: <Users className="w-3 h-3" /> },
     { key: 'channels', label: 'Channels', icon: <Radio className="w-3 h-3" /> },

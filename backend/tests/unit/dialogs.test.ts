@@ -140,6 +140,12 @@ describe('SPEC-03: Entity Normalization & Conversation Navigation', () => {
       expect(result.items.every((d) => d.isArchived)).toBe(true);
     });
 
+    it('filters dialogs by CRM metadata (crm)', async () => {
+      const result = await dialogsService.getDialogs({ category: 'crm' });
+      expect(result.items.length).toBeGreaterThan(0);
+      expect(result.items.every((d) => d.customProfile !== null)).toBe(true);
+    });
+
     it('filters dialogs by search query (q) and handles @ prefix and normalization', async () => {
       const result = await dialogsService.getDialogs({ q: 'Farhad' });
       expect(result.items).toHaveLength(1);

@@ -62,6 +62,8 @@ describe('Frontend Dialog Navigation & Categorization (SPEC-03)', () => {
   it('filters dialogs by category correctly', () => {
     const filterByCategory = (items: DialogItem[], cat: DialogCategory) => {
       switch (cat) {
+        case 'crm':
+          return items.filter((d) => d.customProfile !== null);
         case 'pv':
           return items.filter((d) => d.entityType === 'user' && !d.isArchived);
         case 'groups':
@@ -77,6 +79,8 @@ describe('Frontend Dialog Navigation & Categorization (SPEC-03)', () => {
     };
 
     expect(filterByCategory(mockDialogs, 'all')).toHaveLength(2);
+    expect(filterByCategory(mockDialogs, 'crm')).toHaveLength(1);
+    expect(filterByCategory(mockDialogs, 'crm')[0]?.telegramPeerId).toBe('1001');
     expect(filterByCategory(mockDialogs, 'pv')).toHaveLength(1);
     expect(filterByCategory(mockDialogs, 'pv')[0]?.telegramPeerId).toBe('1001');
     expect(filterByCategory(mockDialogs, 'groups')).toHaveLength(1);

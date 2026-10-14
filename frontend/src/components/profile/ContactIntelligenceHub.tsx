@@ -330,45 +330,72 @@ export function ContactIntelligenceHub({
     }
   };
 
-  // Toggle Tag on Profile
+  // Toggle Tag on Profile (SPEC-06 §4.2)
   const handleToggleTag = async (tag: TagDto) => {
-    if (!profile) {
-      setFeedback({ type: 'error', message: 'Save the profile first before attaching tags.' });
-      return;
-    }
-    const isAssigned = profile.tags.some((t) => t.id === tag.id);
-    try {
-      if (isAssigned) {
-        await apiFetch(`/api/backend/profiles/${profile.id}/tags/${tag.id}`, {
-          method: 'DELETE',
-        });
-        const updated = {
-          ...profile,
-          tags: profile.tags.filter((t) => t.id !== tag.id),
+    if (!dialog) return;
+    setFeedback(null);
+
+    let activeProfile = profile;
+    if (!activeProfile) {
+      try {
+        const payload: CreateProfileInput = {
+          telegramEntityId: dialog.id,
+          telegramPeerId: dialog.telegramPeerId,
+          telegramDisplayName: dialog.displayName || null,
+          username: dialog.username,
+          entityType: dialog.entityType,
         };
-        setProfile(updated);
-        onProfileUpdated(updated);
-      } else {
-        await apiFetch(`/api/backend/profiles/${profile.id}/tags/${tag.id}`, {
+        activeProfile = await apiFetch<CustomProfileDto>('/api/backend/profiles', {
           method: 'POST',
+          body: JSON.stringify(payload),
         });
-        const updated = {
-          ...profile,
-          tags: [...profile.tags, tag],
-        };
-        setProfile(updated);
-        onProfileUpdated(updated);
+        setProfile(activeProfile);
+        onProfileUpdated(activeProfile);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Failed to create profile for tag';
+        setFeedback({ type: 'error', message: msg });
+        return;
       }
+    }
+
+    const isAssigned = activeProfile.tags.some((t) => t.id === tag.id);
+    const newTags = isAssigned
+      ? activeProfile.tags.filter((t) => t.id !== tag.id)
+      : [...activeProfile.tags, tag];
+
+    const optimisticProfile: CustomProfileDto = {
+      ...activeProfile,
+      tags: newTags,
+    };
+    setProfile(optimisticProfile);
+    onProfileUpdated(optimisticProfile);
+
+    try {
+      const assignedTags = await apiFetch<TagDto[]>(
+        `/api/backend/profiles/${activeProfile.id}/tags`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ tagIds: newTags.map((t) => t.id) }),
+        }
+      );
+      const confirmed: CustomProfileDto = {
+        ...activeProfile,
+        tags: assignedTags,
+      };
+      setProfile(confirmed);
+      onProfileUpdated(confirmed);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update tag';
       setFeedback({ type: 'error', message: msg });
+      setProfile(activeProfile);
+      onProfileUpdated(activeProfile);
     }
   };
 
-  // Create New Global Tag
+  // Create New Global Tag (SPEC-06 §4.2)
   const handleCreateTag = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTagName.trim()) return;
+    if (!newTagName.trim() || !dialog) return;
     setSavingTag(true);
     setFeedback(null);
     try {
@@ -381,17 +408,44 @@ export function ContactIntelligenceHub({
         body: JSON.stringify(payload),
       });
 
-      if (profile) {
-        await apiFetch(`/api/backend/profiles/${profile.id}/tags/${createdTag.id}`, {
-          method: 'POST',
-        });
-        const updated = {
-          ...profile,
-          tags: [...profile.tags, createdTag],
+      let activeProfile = profile;
+      if (!activeProfile) {
+        try {
+          const profilePayload: CreateProfileInput = {
+            telegramEntityId: dialog.id,
+            telegramPeerId: dialog.telegramPeerId,
+            telegramDisplayName: dialog.displayName || null,
+            username: dialog.username,
+            entityType: dialog.entityType,
+          };
+          activeProfile = await apiFetch<CustomProfileDto>('/api/backend/profiles', {
+            method: 'POST',
+            body: JSON.stringify(profilePayload),
+          });
+          setProfile(activeProfile);
+          onProfileUpdated(activeProfile);
+        } catch {
+          // Non-fatal
+        }
+      }
+
+      if (activeProfile) {
+        const newTags = [...activeProfile.tags, createdTag];
+        const assignedTags = await apiFetch<TagDto[]>(
+          `/api/backend/profiles/${activeProfile.id}/tags`,
+          {
+            method: 'PUT',
+            body: JSON.stringify({ tagIds: newTags.map((t) => t.id) }),
+          }
+        );
+        const updated: CustomProfileDto = {
+          ...activeProfile,
+          tags: assignedTags,
         };
         setProfile(updated);
         onProfileUpdated(updated);
       }
+
       setIsCreatingTag(false);
       setNewTagName('');
       setFeedback({ type: 'success', message: `Tag "${createdTag.name}" created and assigned.` });

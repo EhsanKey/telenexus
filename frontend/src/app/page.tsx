@@ -379,6 +379,23 @@ export default function WorkspacePage() {
               </button>
 
               <button
+                onClick={() => setActiveCategory('crm')}
+                className={`w-full px-3 py-2 rounded-xl font-medium flex justify-between items-center transition text-left ${
+                  activeCategory === 'crm'
+                    ? 'bg-slate-800/90 text-emerald-400 shadow-sm border border-emerald-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>In CRM Vault</span>
+                </div>
+                <span className="text-[10px] bg-slate-900 px-1.5 py-0.5 rounded-full text-emerald-400 font-mono">
+                  {dialogs.filter((d) => Boolean(d.customProfile)).length}
+                </span>
+              </button>
+
+              <button
                 onClick={() => setActiveCategory('pv')}
                 className={`w-full px-3 py-2 rounded-xl transition text-left flex items-center gap-2 ${
                   activeCategory === 'pv'

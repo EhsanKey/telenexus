@@ -13,7 +13,7 @@ import { profilesService } from '../profiles/service.js';
 import { AuthRequiredError, NotFoundError } from '../../common/errors.js';
 import { logger, PAGINATION_DEFAULTS } from '../../common/index.js';
 
-export type DialogCategory = 'all' | 'pv' | 'groups' | 'supergroups' | 'channels' | 'archived';
+export type DialogCategory = 'all' | 'crm' | 'pv' | 'groups' | 'supergroups' | 'channels' | 'archived';
 
 export interface DialogItem {
   id: string;
@@ -375,6 +375,7 @@ export class DialogsService {
     // 1. Filter by category
     // SPEC-03 Invariant: Zero data loss! Archived items appear under their respective entity category
     let filtered = this.inMemoryDialogs.filter((item) => {
+      if (category === 'crm') return Boolean(item.customProfile);
       if (category === 'archived') return item.isArchived;
 
       if (category === 'pv') return item.entityType === 'user';

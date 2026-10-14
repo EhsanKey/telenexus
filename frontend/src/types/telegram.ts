@@ -4,7 +4,7 @@
 
 export type NormalizedEntityType = 'user' | 'group' | 'supergroup' | 'channel';
 
-export type DialogCategory = 'all' | 'pv' | 'groups' | 'supergroups' | 'channels' | 'archived';
+export type DialogCategory = 'all' | 'crm' | 'pv' | 'groups' | 'supergroups' | 'channels' | 'archived';
 
 export interface DialogCustomProfile {
   id: string;
