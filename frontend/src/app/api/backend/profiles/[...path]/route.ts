@@ -3,13 +3,23 @@ import { proxyToBackend } from '@/lib/proxy-handler';
 
 async function handleProxy(
   req: NextRequest,
-  context?: { params?: Promise<{ path?: string[] | string }> | { path?: string[] | string } }
+  props: { params: Promise<{ path: string[] }> }
 ) {
-  return proxyToBackend(req, { subsystem: 'profiles', context });
+  let subPath: string | undefined;
+  try {
+    const resolved = await props.params;
+    if (resolved?.path && Array.isArray(resolved.path)) {
+      subPath = resolved.path.join('/');
+    }
+  } catch {
+    // URL-based extraction fallback in proxyToBackend
+  }
+  return proxyToBackend(req, { subsystem: 'profiles', subPath });
 }
 
 export const GET = handleProxy;
 export const POST = handleProxy;
 export const PATCH = handleProxy;
 export const DELETE = handleProxy;
+
 
