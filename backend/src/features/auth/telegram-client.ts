@@ -1,7 +1,7 @@
 import { TelegramClient, Api } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { env } from '../../config/env.js';
-import { sessionStorage } from './session-storage.js';
+import { sessionStorage, type ConnectedAccount } from './session-storage.js';
 import { dashboardAuth } from './dashboard-auth.js';
 import {
   FloodWaitError,
@@ -20,13 +20,7 @@ export type AuthState =
   | 'INTERRUPTED'
   | 'EXPIRED';
 
-export interface ConnectedAccount {
-  id: string;
-  telegramUserId: string;
-  displayName: string;
-  username: string | null;
-  phoneNumber?: string;
-}
+export type { ConnectedAccount };
 
 export class TelegramService {
   private client: TelegramClient | null = null;
@@ -45,13 +39,10 @@ export class TelegramService {
     }
     if (savedSession) {
       this.state = 'CONNECTED';
-      // In development placeholder account if restored
-      this.cachedAccount = {
-        id: 'account-1001',
-        telegramUserId: '987654321',
-        displayName: 'Telegram User',
-        username: 'telegram_user',
-      };
+      const inMemoryAcc = sessionStorage.loadAccount();
+      if (inMemoryAcc) {
+        this.cachedAccount = inMemoryAcc;
+      }
     }
 
     if (!this.isSimulationMode()) {
@@ -76,22 +67,48 @@ export class TelegramService {
         return;
       }
 
-      const client = await this.ensureClient();
-      if (client) {
-        const me: any = await client.getMe();
-        if (me) {
-          this.cachedAccount = {
-            id: 'acc-' + me.id,
-            telegramUserId: String(me.id),
-            displayName: [me.firstName, me.lastName].filter(Boolean).join(' ') || 'Telegram User',
-            username: me.username || null,
-            phoneNumber: me.phone,
-          };
+      // Restore saved user account profile immediately from database
+      if (!this.cachedAccount) {
+        const savedAccount = await sessionStorage.loadAccountFromDb();
+        if (savedAccount) {
+          this.cachedAccount = savedAccount;
           this.state = 'CONNECTED';
           logger.info(
-            { displayName: this.cachedAccount.displayName },
-            'Restored and verified active Telegram MTProto session'
+            { displayName: savedAccount.displayName },
+            'Restored active Telegram account profile from Neon PostgreSQL.'
           );
+        }
+      }
+
+      const client = await this.ensureClient();
+      if (client) {
+        try {
+          const me: any = await client.getMe();
+          if (me) {
+            this.cachedAccount = {
+              id: 'acc-' + me.id,
+              telegramUserId: String(me.id),
+              displayName: [me.firstName, me.lastName].filter(Boolean).join(' ') || 'Telegram User',
+              username: me.username || null,
+              phoneNumber: me.phone || this.cachedAccount?.phoneNumber,
+            };
+            this.state = 'CONNECTED';
+            await sessionStorage.saveAccount(this.cachedAccount);
+            logger.info(
+              { displayName: this.cachedAccount.displayName },
+              'Verified and refreshed active Telegram MTProto session'
+            );
+          }
+        } catch (meErr: any) {
+          const errMsg = String(meErr?.errorMessage || meErr?.message || '');
+          if (errMsg.includes('USER_DEACTIVATED') || errMsg.includes('AUTH_KEY_UNREGISTERED')) {
+            this.state = 'DISCONNECTED';
+            this.cachedAccount = null;
+            sessionStorage.clearSession();
+            logger.warn('Saved Telegram MTProto session was deactivated by Telegram.');
+          } else {
+            logger.warn({ meErr }, 'Notice: GramJS live getMe verification deferred; keeping restored session active');
+          }
         }
       }
     } catch (err) {
@@ -165,13 +182,20 @@ export class TelegramService {
         };
       }
 
-      this.client = new TelegramClient(
+      const client = new TelegramClient(
         this.currentStringSession,
         env.TELEGRAM_API_ID,
         env.TELEGRAM_API_HASH,
         clientOptions
       );
-      await this.client.connect();
+      await client.connect();
+      this.client = client;
+    } else if (!this.client.connected) {
+      try {
+        await this.client.connect();
+      } catch (err) {
+        logger.warn({ err }, 'GramJS client reconnect attempt notice');
+      }
     }
     return this.client;
   }
@@ -255,6 +279,7 @@ export class TelegramService {
 
       const mockSession = 'sim_session_' + Buffer.from(phoneNumber).toString('base64');
       await sessionStorage.saveEncryptedSession(mockSession);
+      await sessionStorage.saveAccount(this.cachedAccount);
 
       return {
         status: 'CONNECTED',
@@ -289,6 +314,8 @@ export class TelegramService {
         phoneNumber: me.phone || phoneNumber,
       };
 
+      await sessionStorage.saveAccount(this.cachedAccount);
+
       return {
         status: 'CONNECTED',
         account: this.cachedAccount,
@@ -321,6 +348,7 @@ export class TelegramService {
       };
 
       await sessionStorage.saveEncryptedSession('sim_session_2fa_ok');
+      await sessionStorage.saveAccount(this.cachedAccount);
       return this.cachedAccount;
     }
 
@@ -349,6 +377,8 @@ export class TelegramService {
         username: me.username || null,
         phoneNumber: me.phone,
       };
+
+      await sessionStorage.saveAccount(this.cachedAccount);
 
       return this.cachedAccount;
     } catch (error: unknown) {

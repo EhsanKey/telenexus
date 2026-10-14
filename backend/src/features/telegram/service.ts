@@ -250,7 +250,15 @@ export class DialogsService {
     const query = params.q?.trim().toLowerCase();
 
     // Live MTProto retrieval if client is active
-    const client = telegramService.getClient();
+    let client = telegramService.getClient();
+    if (!client && authState === 'CONNECTED' && process.env.NODE_ENV !== 'test') {
+      try {
+        client = await telegramService.ensureClient();
+      } catch (err) {
+        logger.warn({ err }, 'Deferred client initialization attempt notice in getDialogs');
+      }
+    }
+
     const shouldSyncFromMtproto =
       client &&
       authState === 'CONNECTED' &&
@@ -627,7 +635,14 @@ export class DialogsService {
     const limit = Math.min(Math.max(options.limit || 50, 1), 100);
 
     // 1. Live MTProto retrieval if connected
-    const client = telegramService.getClient();
+    let client = telegramService.getClient();
+    if (!client && telegramService.getState() === 'CONNECTED' && process.env.NODE_ENV !== 'test') {
+      try {
+        client = await telegramService.ensureClient();
+      } catch (err) {
+        logger.warn({ err }, 'Deferred client initialization attempt notice in getMessages');
+      }
+    }
     if (client && telegramService.getState() === 'CONNECTED') {
       try {
         const cleanPeer = peerId.replace(/^ent-/, '').replace(/^-100/, '').replace(/^-/, '');

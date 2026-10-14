@@ -45,6 +45,10 @@ export class DashboardAuthService {
   }
 
   private async persistTokens(): Promise<void> {
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
+
     try {
       const tokensArray = Array.from(this.activeTokens);
       await db
@@ -110,24 +114,26 @@ export class DashboardAuthService {
       updatedAt: now,
     };
 
-    try {
-      await db
-        .insert(applicationSettings)
-        .values({
-          key: 'dashboard_master_passcode',
-          value: JSON.stringify(this.passcodeRecord),
-          updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: applicationSettings.key,
-          set: {
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        await db
+          .insert(applicationSettings)
+          .values({
+            key: 'dashboard_master_passcode',
             value: JSON.stringify(this.passcodeRecord),
             updatedAt: new Date(),
-          },
-        });
-      logger.info('Dashboard master passcode persisted to PostgreSQL database.');
-    } catch (err) {
-      logger.warn({ err }, 'Could not persist passcode to database');
+          })
+          .onConflictDoUpdate({
+            target: applicationSettings.key,
+            set: {
+              value: JSON.stringify(this.passcodeRecord),
+              updatedAt: new Date(),
+            },
+          });
+        logger.info('Dashboard master passcode persisted to PostgreSQL database.');
+      } catch (err) {
+        logger.warn({ err }, 'Could not persist passcode to database');
+      }
     }
 
     logger.info('Dashboard master passcode configured successfully.');
@@ -179,6 +185,10 @@ export class DashboardAuthService {
     this.passcodeRecord = null;
     this.activeTokens.clear();
     this.tokensLoaded = true;
+
+    if (process.env.NODE_ENV === 'test') {
+      return;
+    }
 
     await Promise.all([
       db

@@ -226,6 +226,13 @@ async function showStatus(): Promise<void> {
         preview = '(OAuth token stored)';
       } else if (s.key === 'dashboard_active_tokens') {
         preview = '(active sessions stored)';
+      } else if (s.key === 'telegram_active_account') {
+        try {
+          const acc = JSON.parse(s.value);
+          preview = `(${acc.displayName || acc.username || 'User active'})`;
+        } catch {
+          preview = '(active account stored)';
+        }
       }
       console.log(`  ${c.cyan}• ${s.key.padEnd(28)} ${c.dim}${preview}${c.reset}`);
     }
@@ -500,6 +507,7 @@ async function cleanAuthOnly(dryRun: boolean): Promise<void> {
     'dashboard_master_passcode',
     'dashboard_active_tokens',
     'google_drive_tokens',
+    'telegram_active_account',
   ];
 
   for (const key of authKeys) {
