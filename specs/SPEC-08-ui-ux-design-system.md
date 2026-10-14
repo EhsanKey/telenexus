@@ -71,6 +71,8 @@ To ensure the user is never confused about where a data point originated:
 3. **Unsaved Changes Interceptor:**
    - Custom React hook (`useUnsavedChangesGuard`) tracks form dirty state.
    - Warns user if attempting to switch conversation before saving modified notes.
+4. **Authentication & Passcode Input Accessibility:**
+   - All password and passcode fields (Dashboard Lock Screen, Master Passcode Setup & Confirmation, Telegram 2FA Cloud Password, and Custom Passphrase inputs) include an interactive visibility toggle button (`Eye` / `EyeOff` icons from `lucide-react`) allowing users to inspect or mask their input dynamically.
 
 ## 6. Mobile & Responsive Layout
 - `< 768px` (Mobile):
@@ -84,3 +86,4 @@ To ensure the user is never confused about where a data point originated:
 - [x] Panel widths strictly adhere to the 220-260px / 300-380px / 340-440px guidelines.
 - [x] Visual indicators make Telegram fields immediately distinguishable from custom CRM fields.
 - [x] Form navigation triggers a confirmation prompt when unsaved edits are present.
+- [x] All password and passcode inputs provide interactive Show/Hide visibility toggles.
