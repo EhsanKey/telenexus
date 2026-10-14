@@ -73,7 +73,23 @@ export async function proxyToBackend(
       });
     }
 
-    const data = await backendRes.json();
+    let data: unknown;
+    const rawText = await backendRes.text();
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'UPSTREAM_ERROR',
+            message: `Upstream service returned non-JSON response: ${rawText.slice(0, 120) || backendRes.statusText || 'Internal Server Error'}. The backend server may be waking up or rebooting.`,
+          },
+        },
+        { status: backendRes.status >= 400 ? backendRes.status : 502 }
+      );
+    }
+
     return NextResponse.json(data, { status: backendRes.status });
   } catch (error) {
     return NextResponse.json(
@@ -81,7 +97,7 @@ export async function proxyToBackend(
         success: false,
         error: {
           code: 'PROXY_ERROR',
-          message: `Unable to communicate with upstream ${options.subsystem} service on port 4000`,
+          message: `Unable to communicate with upstream ${options.subsystem} service at ${BACKEND_API_BASE}`,
         },
       },
       { status: 503 }

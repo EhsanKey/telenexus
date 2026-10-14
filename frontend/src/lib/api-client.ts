@@ -64,7 +64,16 @@ export async function apiFetch<T>(
     ...options,
   });
 
-  const payload = (await response.json()) as ApiSuccessResponse<T> | ApiErrorResponse;
+  let payload: ApiSuccessResponse<T> | ApiErrorResponse;
+  const rawText = await response.text();
+  try {
+    payload = JSON.parse(rawText) as ApiSuccessResponse<T> | ApiErrorResponse;
+  } catch {
+    throw new ApiClientError(
+      'SERVER_ERROR',
+      `Server returned an invalid or non-JSON response (${response.status} ${response.statusText || 'Internal Server Error'}). The backend server may still be spinning up. Please try again in a few moments.`
+    );
+  }
 
   if (!payload.success) {
     throw new ApiClientError(
@@ -101,7 +110,16 @@ export async function apiFetchPaginated<T>(
     ...options,
   });
 
-  const payload = (await response.json()) as ApiPaginatedResponse<T> | ApiErrorResponse;
+  let payload: ApiPaginatedResponse<T> | ApiErrorResponse;
+  const rawText = await response.text();
+  try {
+    payload = JSON.parse(rawText) as ApiPaginatedResponse<T> | ApiErrorResponse;
+  } catch {
+    throw new ApiClientError(
+      'SERVER_ERROR',
+      `Server returned an invalid or non-JSON response (${response.status} ${response.statusText || 'Internal Server Error'}). The backend server may still be spinning up. Please try again in a few moments.`
+    );
+  }
 
   if (!payload.success) {
     throw new ApiClientError(
