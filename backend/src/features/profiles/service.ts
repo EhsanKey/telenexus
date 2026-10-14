@@ -816,7 +816,7 @@ export class ProfilesService {
   public async getAllProfiles(accountId?: string): Promise<CustomProfileResponseDto[]> {
     const accId = accountId || this.getCurrentAccountId();
     const records = this.profiles.filter(
-      (p) => !accountId || p.telegramAccountId === accId || p.telegramAccountId === 'acc-default' || true
+      (p) => p.telegramAccountId === accId || p.telegramAccountId === 'acc-default'
     );
     return records.map((r) => this.mapToDto(r));
   }
